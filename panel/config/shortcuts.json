@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Portainer",
+    "url": "https://portainer.ddn.mx",
+    "icon": "Portainer",
+    "iconType": "svg",
+    "iconSlug": "portainer",
+    "color": "bg-gradient-to-br from-gray-600 to-gray-800",
+    "openInWindow": true,
+    "id": "1766009747321"
+  }
+]

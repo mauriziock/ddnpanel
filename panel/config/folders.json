@@ -1,0 +1,18 @@
+[
+  {
+    "path": "/shared",
+    "name": "Shared",
+    "isDisk": false
+  },
+  {
+    "path": "/public",
+    "name": "Public",
+    "isDisk": false
+  },
+  {
+    "path": "/jan/files/documentos",
+    "name": "Mis documentos",
+    "isDisk": false,
+    "icon": "documents"
+  }
+]

@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  panel:
+    # Use the image built from the ./panel directory
+    build:
+      context: ./panel
+      dockerfile: Dockerfile
+    container_name: ddnpanel
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      # --- Application Data Persistence ---
+      # Persist local file storage (Everything: users, shared, public)
+      - ./files-storage:/app/files-storage
+      # Persist application configuration
+      - ./config:/app/config
+      # Persist wallpapers
+      - ./panel/public/wallpapers:/app/public/wallpapers
+
+      # --- System Access ---
+      # Required for Docker Management features
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # --- Drive/Media Access ---
+      # Mount host media/mnt directories with rslave propagation
+      # This enables the container to see new devices mounted on the host dynamically
+      - /media:/media:rslave
+      - /mnt:/mnt:rslave
+      - /run/media:/run/media:rslave
+      # --- Optional User Mounts (Uncomment as needed) ---
+      # - /home/youruser/data:/app/files-storage/users/admin
+
+    environment:
+      # Application Settings
+      - NODE_ENV=production
+      - AUTH_SECRET=changeme_in_production
+      # - NEXTAUTH_URL=http://localhost:3000 # Uncomment if behind proxy needs it
+
+      # User Permissions (Match these to your host user usually 1000:1000)
+      - PUID=1000
+      - PGID=1000
+
+    # Privileged mode is recommended for full drive access (lsblk) and mounting capabilities
+    privileged: true
+    networks:
+      - panel_net
+
+networks:
+  panel_net:
+    driver: bridge
