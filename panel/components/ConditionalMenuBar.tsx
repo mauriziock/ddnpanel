@@ -5,5 +5,5 @@ export default async function ConditionalMenuBar() {
     const session = await auth()
 
     // Always show menu bar, but pass login status and user info
-    return <SystemMenuBar isLoggedIn={!!session} user={session?.user} />
+    return <SystemMenuBar isLoggedIn={!!session?.user} user={session?.user} />
 }

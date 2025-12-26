@@ -66,9 +66,15 @@ export async function PATCH(req: Request) {
         const updates: any = {}
         if (wallpaper !== undefined) updates.wallpaper = wallpaper
 
-        // Only admins can update other fields
+        // Only admins can update all fields
+        // Users can update their own password and wallpaper
         if (session.user.role === 'admin') {
             Object.assign(updates, otherUpdates)
+        } else if (session.user.id === id) {
+            // Self-update: allow password change
+            if (otherUpdates.password) {
+                updates.password = otherUpdates.password
+            }
         }
 
         const updatedUser = await updateUser(id, updates)

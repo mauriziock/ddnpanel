@@ -6,7 +6,7 @@ import { useWindows } from './WindowContext'
 import { useSettings } from './SettingsContext'
 import SettingsClient from '@/app/settings/SettingsClient'
 
-export default function MacMenuBar({ isLoggedIn = true, user }: { isLoggedIn?: boolean, user?: any }) {
+export default function MacMenuBar({ isLoggedIn = false, user }: { isLoggedIn?: boolean, user?: any }) {
     const { t } = useSettings()
     const { openWindow } = useWindows()
     const [time, setTime] = useState('')
