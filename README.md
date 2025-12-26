@@ -35,33 +35,53 @@ Un panel de control moderno con interfaz tipo sistema operativo (inspirado clara
 
 ### Despliegue con Docker (Recomendado)
 
-1. Clona el repositorio:
+1. **Clonar el repositorio**:
    ```bash
    git clone https://github.com/mauriziock/ddnpanel.git
    cd ddnpanel
    ```
 
-2. Ejecuta el contenedor:
+2. **Configurar variables de entorno**:
+   Copia el archivo de ejemplo y genera tu `AUTH_SECRET`:
+   ```bash
+   cp .env.example .env
+   # Genera un secret aleatorio
+   openssl rand -base64 32 # Pégalo en AUTH_SECRET en tu .env
+   ```
+
+3. **Ejecutar el contenedor**:
    ```bash
    docker-compose up -d --build
    ```
 
-3. Accede en: `http://localhost:3000`
+4. **Acceso**: `http://localhost:3000`
 
 ### Credenciales por Defecto
 - **Usuario**: `admin`
 - **Contraseña**: `admin`
 
-## Administración y Seguridad
+## Configuración Especial
 
-### Restablecimiento de Contraseña
-Si pierdes el acceso, puedes usar la herramienta integrada vía terminal:
+### 1. Uso detrás de un Reverse Proxy (Nginx Proxy Manager, Traefik, etc.)
+Si vas a exponer el panel a través de un dominio con SSL mediante un proxy, asegúrate de:
+- Configurar `AUTH_TRUST_HOST=true` en el `docker-compose.yml` (activado por defecto en la versión actual).
+- (Opcional) Definir `NEXTAUTH_URL=https://tu-dominio.com` si experimentas problemas con las redirecciones.
+- Si usas **Nginx Proxy Manager**, activa la opción "Websockets Support" para una mejor experiencia.
+
+### 2. Gestión de Permisos (PUID/PGID)
+El contenedor está diseñado para trabajar con los archivos de tu host sin problemas de permisos:
+- **Mapeo automático**: Usa `PUID` y `PGID` en el `docker-compose.yml` para coincidir con tu usuario de Linux (típicamente `1000`).
+- **Resolución de Conflictos**: El script de entrada (`entrypoint.sh`) resuelve automáticamente conflictos con el usuario `node` (UID 1000) interno de Alpine, permitiendo que asignes el ID 1000 a la aplicación sin errores.
+- **Acceso a Unidades**: Al usar `privileged: true` y montajes `rslave`, el panel detectará automáticamente discos USB o unidades montadas en el host en tiempo real.
+
+## Mantenimiento y Seguridad
+
+### 1. Restablecimiento de Contraseña
+Si pierdes el acceso al panel, puedes restablecer cualquier contraseña desde la terminal de tu host:
 ```bash
-docker exec -it controlpanel node scripts/reset-password.js <usuario> <nueva_contraseña>
+docker exec -it ddnpanel node scripts/reset-password.js <usuario> <nueva_contraseña>
 ```
-
-### Gestión de Permisos (PUID/PGID)
-Para evitar problemas de escritura en discos externos o carpetas locales, el contenedor usa mapeo de usuario. Por defecto es `1000:1000`. Puedes cambiarlo en el `docker-compose.yml`.
+*(Nota: El nombre del contenedor por defecto es `ddnpanel`)*
 
 ## Estructura de Archivos
 

@@ -120,7 +120,58 @@ export const popularApps: AppIcon[] = [
 ]
 
 export function getIconBySlug(slug: string): AppIcon | undefined {
-    return popularApps.find(app => app.slug === slug)
+    // 1. Try popular first (fastest)
+    const popular = popularApps.find(app => app.slug === slug)
+    if (popular) return popular
+
+    // 2. Try to find in full catalog
+    // Find the icon object in SimpleIcons exports by converting to values
+    const foundIcon = Object.values(SimpleIcons).find((icon: any) =>
+        icon && icon.slug === slug
+    ) as any
+
+    if (foundIcon) {
+        return {
+            name: foundIcon.title,
+            slug: foundIcon.slug,
+            color: '#' + foundIcon.hex,
+            svg: foundIcon.svg
+        }
+    }
+
+    return undefined
+}
+
+export function searchIcons(query: string): AppIcon[] {
+    const lowerQuery = query.toLowerCase()
+
+    // First check popular apps for efficient matches
+    const popularMatches = popularApps.filter(app =>
+        app.name.toLowerCase().includes(lowerQuery) ||
+        app.slug.toLowerCase().includes(lowerQuery)
+    )
+
+    // If we have enough popular matches, return them to be faster
+    // But if user wants specific ones, we should search all
+
+    // Search entire catalog
+    // Convert SimpleIcons exports to array
+    const allIcons = Object.values(SimpleIcons)
+        .filter((icon: any) => icon && icon.title && icon.slug && icon.svg)
+        .map((icon: any) => ({
+            name: icon.title,
+            slug: icon.slug,
+            color: '#' + icon.hex,
+            svg: icon.svg
+        }))
+
+    const matches = allIcons.filter(icon =>
+        icon.name.toLowerCase().includes(lowerQuery) ||
+        icon.slug.toLowerCase().includes(lowerQuery)
+    )
+
+    // Limit results performance
+    return matches.slice(0, 50)
 }
 
 export function renderIcon(svg: string, className: string = 'w-10 h-10'): JSX.Element {

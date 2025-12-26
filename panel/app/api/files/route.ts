@@ -8,8 +8,17 @@ import { getUserById } from "@/lib/users"
 
 const STORAGE_ROOT = path.resolve(process.cwd(), "files-storage")
 
-// Ensure storage root exists
-fs.mkdir(STORAGE_ROOT, { recursive: true }).catch(console.error)
+// Helper to ensure basic directories exist
+async function ensureBaseDirs() {
+    try {
+        await fs.mkdir(STORAGE_ROOT, { recursive: true })
+        await fs.mkdir(path.join(STORAGE_ROOT, "public"), { recursive: true })
+        await fs.mkdir(path.join(STORAGE_ROOT, "shared"), { recursive: true })
+        await fs.mkdir(path.join(STORAGE_ROOT, "users"), { recursive: true })
+    } catch (e) {
+        console.error("Error ensuring base directories:", e)
+    }
+}
 
 // Helper to check if user has access to a path
 async function checkUserAccess(userId: string, requestedPath: string): Promise<boolean> {
@@ -57,6 +66,7 @@ function resolvePath(requestPath: string): { fullPath: string, isExternal: boole
 }
 
 export async function GET(req: Request) {
+    await ensureBaseDirs()
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
@@ -154,6 +164,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+    await ensureBaseDirs()
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
@@ -270,7 +281,7 @@ export async function POST(req: Request) {
                 const zipName = stats.isDirectory() ? `${baseName}.zip` : `${baseName.replace(/\.[^.]+$/, '')}.zip`
                 const zipPath = path.join(path.dirname(fullPath), zipName)
 
-                return new Promise((resolve, reject) => {
+                return new Promise<Response>((resolve, reject) => {
                     const output = createWriteStream(zipPath)
                     const archive = archiver('zip', { zlib: { level: 9 } })
 
@@ -320,6 +331,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+    await ensureBaseDirs()
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 

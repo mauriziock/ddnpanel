@@ -1,12 +1,22 @@
 [
   {
-    "name": "Portainer",
-    "url": "https://portainer.ddn.mx",
-    "icon": "Portainer",
+    "name": "npm",
+    "url": "https://npm.dden.mx",
+    "icon": "Nginx Proxy Manager",
     "iconType": "svg",
-    "iconSlug": "portainer",
-    "color": "bg-gradient-to-br from-gray-600 to-gray-800",
-    "openInWindow": true,
-    "id": "1766009747321"
+    "iconSlug": "nginxproxymanager",
+    "color": "bg-gradient-to-br from-yellow-500 to-orange-500",
+    "openInWindow": false,
+    "id": "1766780335377"
+  },
+  {
+    "name": "My Discord",
+    "url": "https://discord.com",
+    "icon": "Discord",
+    "iconType": "svg",
+    "iconSlug": "discord",
+    "color": "bg-gradient-to-br from-blue-500 to-purple-600",
+    "openInWindow": false,
+    "id": "1766780857090"
   }
 ]

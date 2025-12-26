@@ -35,7 +35,7 @@ export async function POST(req: Request) {
             username,
             password,
             role: role || 'user',
-            folders: folders || ['/shared']
+            folders: folders
         })
 
         const { password: _, ...safeUser } = newUser

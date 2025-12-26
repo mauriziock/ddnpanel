@@ -7,7 +7,7 @@ import FileManager from "@/components/FileManager"
 import SettingsClient from "@/app/settings/SettingsClient"
 import SystemWidgets from "@/components/SystemWidgets"
 import IframeViewer from "@/components/IframeViewer"
-import { popularApps, AppIcon as SimpleIcon } from "@/lib/appIcons"
+import { popularApps, AppIcon as SimpleIcon, searchIcons, getIconBySlug } from "@/lib/appIcons"
 import { useEffect, useState } from "react"
 import { useSettings } from "@/components/SettingsContext"
 import { useRouter } from "next/navigation"
@@ -83,7 +83,7 @@ function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick }: Sor
                             <div
                                 className="w-10 h-10 [&>svg]:w-full [&>svg]:h-full [&>svg]:fill-current"
                                 dangerouslySetInnerHTML={{
-                                    __html: popularApps.find(app => app.slug === shortcut.iconSlug)?.svg || ''
+                                    __html: getIconBySlug(shortcut.iconSlug)?.svg || ''
                                 }}
                             />
                         ) : (
@@ -252,11 +252,8 @@ export default function DashboardClient({ user }: { user: any }) {
         if (iconSearch.trim() === '') {
             setFilteredIcons(popularApps)
         } else {
-            const filtered = popularApps.filter(app =>
-                app.name.toLowerCase().includes(iconSearch.toLowerCase()) ||
-                app.slug.toLowerCase().includes(iconSearch.toLowerCase())
-            )
-            setFilteredIcons(filtered)
+            const results = searchIcons(iconSearch)
+            setFilteredIcons(results)
         }
     }, [iconSearch])
 
@@ -299,7 +296,7 @@ export default function DashboardClient({ user }: { user: any }) {
                 <div
                     className="w-6 h-6 [&>svg]:w-full [&>svg]:h-full [&>svg]:fill-current"
                     dangerouslySetInnerHTML={{
-                        __html: popularApps.find(app => app.slug === shortcut.iconSlug)?.svg || ''
+                        __html: getIconBySlug(shortcut.iconSlug)?.svg || ''
                     }}
                 />
             ) : (
@@ -513,7 +510,7 @@ export default function DashboardClient({ user }: { user: any }) {
                                             <div
                                                 className="w-6 h-6 [&>svg]:w-full [&>svg]:h-full [&>svg]:fill-current text-primary-600"
                                                 dangerouslySetInnerHTML={{
-                                                    __html: popularApps.find(app => app.slug === formData.iconSlug)?.svg || ''
+                                                    __html: getIconBySlug(formData.iconSlug)?.svg || ''
                                                 }}
                                             />
                                             <span className="text-sm font-medium text-purple-900">{formData.icon}</span>

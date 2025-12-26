@@ -29,23 +29,23 @@ export default function DarkVeilBackground() {
             speedY: number
             opacity: number
 
-            constructor() {
-                this.x = Math.random() * canvas.width
-                this.y = Math.random() * canvas.height
+            constructor(width: number, height: number) {
+                this.x = Math.random() * width
+                this.y = Math.random() * height
                 this.size = Math.random() * 300 + 100
                 this.speedX = Math.random() * 0.5 - 0.25
                 this.speedY = Math.random() * 0.5 - 0.25
                 this.opacity = Math.random() * 0.15 + 0.05
             }
 
-            update() {
+            update(width: number, height: number) {
                 this.x += this.speedX
                 this.y += this.speedY
 
-                if (this.x > canvas.width) this.x = 0
-                if (this.x < 0) this.x = canvas.width
-                if (this.y > canvas.height) this.y = 0
-                if (this.y < 0) this.y = canvas.height
+                if (this.x > width) this.x = 0
+                if (this.x < 0) this.x = width
+                if (this.y > height) this.y = 0
+                if (this.y < 0) this.y = height
             }
 
             draw() {
@@ -66,7 +66,7 @@ export default function DarkVeilBackground() {
         // Create particles
         const particles: Particle[] = []
         for (let i = 0; i < 15; i++) {
-            particles.push(new Particle())
+            particles.push(new Particle(canvas.width, canvas.height))
         }
 
         // Animation loop
@@ -81,7 +81,7 @@ export default function DarkVeilBackground() {
 
             // Update and draw particles
             particles.forEach(particle => {
-                particle.update()
+                particle.update(canvas.width, canvas.height)
                 particle.draw()
             })
 

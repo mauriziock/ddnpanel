@@ -30,6 +30,16 @@ async function ensureUsersFile() {
         await fs.mkdir(configDir, { recursive: true })
     }
 
+    // Ensure storage root directories exist
+    const STORAGE_ROOT = path.resolve(process.cwd(), 'files-storage')
+    try {
+        await fs.mkdir(path.join(STORAGE_ROOT, 'shared'), { recursive: true })
+        await fs.mkdir(path.join(STORAGE_ROOT, 'public'), { recursive: true })
+        await fs.mkdir(path.join(STORAGE_ROOT, 'users'), { recursive: true })
+    } catch (error) {
+        console.error('Error creating default storage directories:', error)
+    }
+
     try {
         await fs.access(USERS_FILE)
     } catch {
@@ -84,7 +94,7 @@ export async function createUser(userData: Omit<User, 'id' | 'password'> & { pas
         ...userData,
         id: String(Date.now()),
         password: await bcrypt.hash(userData.password, 10),
-        folders: userData.folders || defaultFolders, // Use provided folders or defaults
+        folders: (userData.folders && userData.folders.length > 0) ? userData.folders : defaultFolders, // Use provided folders or defaults
         wallpaper: userData.wallpaper || '/wallpapers/wallpaper_1.png' // Default wallpaper (Silk Flow)
     }
 

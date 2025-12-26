@@ -37,6 +37,7 @@ services:
       - NODE_ENV=production
       - AUTH_SECRET=changeme_in_production
       # - NEXTAUTH_URL=http://localhost:3000 # Uncomment if behind proxy needs it
+      - AUTH_TRUST_HOST=true
 
       # User Permissions (Match these to your host user usually 1000:1000)
       - PUID=1000

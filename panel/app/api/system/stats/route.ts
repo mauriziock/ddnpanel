@@ -16,9 +16,9 @@ export async function GET() {
             },
             memory: {
                 total: mem.total,
-                used: mem.used,
-                free: mem.free,
-                usagePercent: Math.round((mem.used / mem.total) * 100)
+                used: mem.total - mem.available,
+                free: mem.available,
+                usagePercent: Math.round(((mem.total - mem.available) / mem.total) * 100)
             },
             disk: {
                 total: disk[0]?.size || 0,

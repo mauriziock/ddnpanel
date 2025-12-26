@@ -9,6 +9,21 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # In alpine:
     # shadow package provides usermod/groupmod
     
+    # If the requested PUID is already taken by another user (e.g. node created by base image), 
+    # and that user is NOT nextjs, we need to free it up.
+    EXISTING_USER=$(getent passwd "$PUID" | cut -d: -f1)
+    if [ -n "$EXISTING_USER" ] && [ "$EXISTING_USER" != "nextjs" ]; then
+        echo "UID $PUID is already taken by $EXISTING_USER. Dealing with conflict..."
+        
+        # If it's the default 'node' user or similar, we can safely delete or move it
+        if [ "$EXISTING_USER" = "node" ]; then
+             deluser node
+        else
+             # For other users, move them out of the way just in case
+             usermod -u 1100 "$EXISTING_USER"
+        fi
+    fi
+
     # Change group id
     if [ $(getent group nextjs | cut -d: -f3) != "$PGID" ]; then
         echo "Setting nextjs GID to $PGID"
