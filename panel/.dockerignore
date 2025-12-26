@@ -16,4 +16,4 @@ yarn-error.log
 
 config/
 files-storage/
-public/wallpapers/
+# public/wallpapers/ is now included to allow volume initialization

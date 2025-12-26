@@ -70,6 +70,9 @@ RUN mkdir -p /app/files-storage && chown nextjs:nextjs /app/files-storage
 COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Backup default wallpapers to initialize volume
+RUN mkdir -p /app/wallpapers-backup && cp -a /app/public/wallpapers/. /app/wallpapers-backup/
+
 # Start as root so entrypoint can modify users, then it will switch to nextjs
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 

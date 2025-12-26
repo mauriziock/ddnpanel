@@ -38,8 +38,19 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
 
     # Fix ownership of necessary directories
     echo "Fixing permissions..."
+    mkdir -p /app/.next /app/files-storage /app/config /app/public/wallpapers
+    
     chown -R nextjs:nextjs /app/.next 
     chown -R nextjs:nextjs /app/files-storage
+    chown -R nextjs:nextjs /app/config
+    chown -R nextjs:nextjs /app/public/wallpapers
+
+    # Restore default wallpapers if volume is empty
+    if [ -z "$(ls -A /app/public/wallpapers)" ]; then
+        echo "Initializing wallpapers volume with defaults..."
+        cp -r /app/wallpapers-backup/* /app/public/wallpapers/
+        chown -R nextjs:nextjs /app/public/wallpapers/
+    fi
     # Note: We don't chown /media or /mnt because those are host mounts
 fi
 
