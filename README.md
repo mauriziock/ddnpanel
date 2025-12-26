@@ -33,6 +33,7 @@ services:
       - PGID=1000
       - AUTH_SECRET=una_clave_aleatoria_de_32_caracteres
       - AUTH_TRUST_HOST=true
+      - AUTH_URL=https://tu-dominio.com/api/auth # Requerido si usas dominio propio (https)
     volumes:
       - ./config:/app/config
       - ./files-storage:/app/files-storage
@@ -64,7 +65,8 @@ Accede a traves de `http://localhost:3000`.
 | PUID | ID de usuario del host para permisos de archivos | No (Default: 1000) |
 | PGID | ID de grupo del host para permisos de archivos | No (Default: 1000) |
 | AUTH_TRUST_HOST | Debe ser `true` si se usa detras de un proxy | No (Default: true) |
-| NEXTAUTH_URL | URL publica de la aplicacion (necesario en algunos proxys) | No |
+| NEXTAUTH_URL | (Deprecated) Usar AUTH_URL en su lugar | No |
+| AUTH_URL | URL completa del panel (ej: https://panel.com/api/auth) | Si (en Produccion) |
 
 ## Construccion desde el Codigo Fuente
 
