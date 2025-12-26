@@ -43,12 +43,12 @@ export default function UserProfile({
 
         setSaving(true)
         try {
-            const res = await fetch(`/api/users/${user.id}/password`, {
-                method: 'POST',
+            const res = await fetch('/api/users', {
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    currentPassword,
-                    newPassword
+                    id: user.id,
+                    password: newPassword
                 })
             })
 
