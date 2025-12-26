@@ -13,7 +13,7 @@ yarn-debug.log
 yarn-error.log
 .DS_Store
 
-# Data directories - IMPORTANT: Don't bake your private users into the image
+
 config/
 files-storage/
 public/wallpapers/
