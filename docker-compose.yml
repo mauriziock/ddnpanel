@@ -8,8 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: ddnpanel
     restart: always
-    ports:
-      - "3000:3000"
+
     volumes:
       # --- Application Data Persistence ---
       # Persist local file storage (Everything: users, shared, public)

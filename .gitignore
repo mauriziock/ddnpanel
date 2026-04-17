@@ -1,0 +1,13 @@
+# Environment secrets
+.env
+.env.local
+
+# Runtime data (generated on container start)
+config/
+files-storage/
+
+# Docker override (local dev only)
+docker-compose.override.yml
+
+# OS
+.DS_Store
