@@ -52,6 +52,24 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
         chown -R nextjs:nextjs /app/public/wallpapers/
     fi
     # Note: We don't chown /media or /mnt because those are host mounts
+
+    # --- DOCKER SOCKET PERMISSIONS OVERRIDE ---
+    # In order to allow Next.js (running as nextjs) to talk to the Docker daemon
+    # over the mounted Unix socket, it must be part of the group that owns the socket.
+    if [ -S /var/run/docker.sock ]; then
+        DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+        # Check if a group with this ID already exists
+        DOCKER_GROUP=$(getent group "$DOCKER_GID" | cut -d: -f1)
+        if [ -z "$DOCKER_GROUP" ]; then
+            echo "Creating group 'dockersock' for GID $DOCKER_GID..."
+            groupadd -g "$DOCKER_GID" dockersock
+            DOCKER_GROUP="dockersock"
+        fi
+        echo "Adding nextjs user to group $DOCKER_GROUP to access docker.sock..."
+        usermod -aG "$DOCKER_GROUP" nextjs
+    fi
+    # ------------------------------------------
+
 fi
 
 # Clear terminal message

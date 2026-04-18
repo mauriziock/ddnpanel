@@ -1,14 +1,14 @@
 "use client"
 
 import DashboardGrid, { AppIcon } from "@/components/Dashboard/Grid"
-import { FolderOpen, Settings, Edit3, Plus, X, Edit2, Search } from "lucide-react"
+import { FolderOpen, Settings, Edit3, Plus, X, Edit2, Search, Container, Play, Square } from "lucide-react"
 import { useWindows } from "@/components/WindowContext"
 import FileManager from "@/components/FileManager"
 import SettingsClient from "@/app/settings/SettingsClient"
 import SystemWidgets from "@/components/SystemWidgets"
 import IframeViewer from "@/components/IframeViewer"
 import { popularApps, AppIcon as SimpleIcon, searchIcons, getIconBySlug } from "@/lib/appIcons"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useSettings } from "@/components/SettingsContext"
 import { useRouter } from "next/navigation"
 import {
@@ -38,6 +38,17 @@ interface Shortcut {
     iconSlug?: string
     color: string
     openInWindow?: boolean
+    dockerContainer?: string
+}
+
+interface DockerContainer {
+    id: string
+    shortId: string
+    name: string
+    image: string
+    state: string
+    status: string
+    protected: boolean
 }
 
 interface SortableShortcutProps {
@@ -46,9 +57,11 @@ interface SortableShortcutProps {
     onDelete: (id: string) => void
     onEdit: (shortcut: Shortcut) => void
     onClick: (shortcut: Shortcut) => void
+    dockerState?: string
+    onDockerToggle?: (shortcut: Shortcut, currentState: string) => void
 }
 
-function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick }: SortableShortcutProps) {
+function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick, dockerState, onDockerToggle }: SortableShortcutProps) {
     const {
         attributes,
         listeners,
@@ -68,6 +81,16 @@ function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick }: Sor
             onClick(shortcut)
         }
     }
+
+    const handleDockerBadgeClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (onDockerToggle && dockerState) {
+            onDockerToggle(shortcut, dockerState)
+        }
+    }
+
+    const isRunning = dockerState === 'running'
+    const hasDocker = !!shortcut.dockerContainer
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="relative group">
@@ -93,6 +116,22 @@ function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick }: Sor
                     color={shortcut.color}
                 />
             </div>
+
+            {/* Docker status badge */}
+            {hasDocker && !editMode && (
+                <button
+                    onClick={handleDockerBadgeClick}
+                    title={dockerState === 'running' ? 'Running — click to stop' : 'Stopped — click to start'}
+                    className={`absolute bottom-5 right-1 w-4 h-4 rounded-full border-2 border-white shadow-md transition-colors ${
+                        dockerState === 'running'
+                            ? 'bg-green-400 hover:bg-red-400'
+                            : dockerState
+                            ? 'bg-gray-500 hover:bg-green-400'
+                            : 'bg-gray-400'
+                    }`}
+                />
+            )}
+
             {editMode && (
                 <div className="absolute -top-2 -right-2 flex gap-1 z-10">
                     <button
@@ -136,10 +175,19 @@ export default function DashboardClient({ user }: { user: any }) {
         iconType: 'emoji' as 'emoji' | 'svg',
         iconSlug: '',
         color: 'bg-gradient-to-br from-blue-500 to-purple-600',
-        openInWindow: false
+        openInWindow: false,
+        dockerContainer: '',
     })
     const [iconSearch, setIconSearch] = useState('')
     const [filteredIcons, setFilteredIcons] = useState<SimpleIcon[]>(popularApps)
+
+    // Docker state
+    const [dockerStatuses, setDockerStatuses] = useState<Record<string, string>>({})
+    const [dockerContainers, setDockerContainers] = useState<DockerContainer[]>([])
+    const [dockerTogglingId, setDockerTogglingId] = useState<string | null>(null)
+    const [dockerModalLoading, setDockerModalLoading] = useState(false)
+    const [dockerModalError, setDockerModalError] = useState<string | null>(null)
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -148,14 +196,12 @@ export default function DashboardClient({ user }: { user: any }) {
         })
     )
 
-    // Check if user session is valid
     useEffect(() => {
         if (!user) {
             router.push('/login')
         }
     }, [user, router])
 
-    // Load shortcuts
     useEffect(() => {
         fetchShortcuts()
     }, [])
@@ -172,12 +218,91 @@ export default function DashboardClient({ user }: { user: any }) {
         }
     }
 
+    // Fetch Docker container statuses and update the status map
+    const fetchDockerStatuses = useCallback(async (forModal = false) => {
+        if (forModal) {
+            setDockerModalLoading(true)
+            setDockerModalError(null)
+        }
+        try {
+            const res = await fetch('/api/docker/containers')
+            if (!res.ok) {
+                const msg = await res.text()
+                if (forModal) setDockerModalError(`Error ${res.status}: ${msg}`)
+                return
+            }
+            const containers: DockerContainer[] = await res.json()
+            const statusMap: Record<string, string> = {}
+            for (const c of containers) {
+                statusMap[c.name] = c.state
+                statusMap[c.shortId] = c.state
+                statusMap[c.id] = c.state
+            }
+            setDockerStatuses(statusMap)
+            setDockerContainers(containers)
+        } catch (err: any) {
+            if (forModal) setDockerModalError('Cannot connect to Docker API')
+        } finally {
+            if (forModal) setDockerModalLoading(false)
+        }
+    }, [])
+
+    // Poll Docker statuses when there are shortcuts with Docker containers linked
+    useEffect(() => {
+        const hasDockerShortcuts = shortcuts.some(s => s.dockerContainer)
+        if (!hasDockerShortcuts) return
+
+        fetchDockerStatuses()
+        pollRef.current = setInterval(fetchDockerStatuses, 10000)
+        return () => {
+            if (pollRef.current) clearInterval(pollRef.current)
+        }
+    }, [shortcuts, fetchDockerStatuses])
+
+    // Fetch Docker containers when modal opens (for the picker)
+    useEffect(() => {
+        if (showModal) {
+            fetchDockerStatuses(true)
+        }
+    }, [showModal, fetchDockerStatuses])
+
+    const handleDockerToggle = async (shortcut: Shortcut, currentState: string) => {
+        if (!shortcut.dockerContainer || dockerTogglingId === shortcut.id) return
+
+        const action = currentState === 'running' ? 'stop' : 'start'
+        setDockerTogglingId(shortcut.id)
+
+        try {
+            const containerId = shortcut.dockerContainer
+            const res = await fetch(`/api/docker/containers/${containerId}/${action}`, { method: 'POST' })
+            if (!res.ok) {
+                const msg = await res.text()
+                if (res.status === 403) {
+                    alert('This container is protected and cannot be controlled.')
+                } else {
+                    alert(`Failed to ${action} container: ${msg}`)
+                }
+            } else {
+                // Optimistic update
+                setDockerStatuses(prev => ({
+                    ...prev,
+                    [containerId]: action === 'start' ? 'running' : 'exited'
+                }))
+                // Refresh actual state after a short delay
+                setTimeout(fetchDockerStatuses, 1500)
+            }
+        } catch (error) {
+            console.error('Docker toggle error:', error)
+        } finally {
+            setDockerTogglingId(null)
+        }
+    }
+
     const handleSaveShortcut = async () => {
         if (!formData.name || !formData.url) return
 
         try {
             if (editingShortcut) {
-                // Update existing
                 const res = await fetch('/api/shortcuts', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -188,7 +313,6 @@ export default function DashboardClient({ user }: { user: any }) {
                     closeModal()
                 }
             } else {
-                // Create new
                 const res = await fetch('/api/shortcuts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -229,25 +353,27 @@ export default function DashboardClient({ user }: { user: any }) {
             iconType: shortcut.iconType || 'emoji',
             iconSlug: shortcut.iconSlug || '',
             color: shortcut.color,
-            openInWindow: shortcut.openInWindow || false
+            openInWindow: shortcut.openInWindow || false,
+            dockerContainer: shortcut.dockerContainer || '',
         })
         setShowModal(true)
     }
 
+    const emptyForm = { name: '', url: '', icon: '🔗', iconType: 'emoji' as const, iconSlug: '', color: 'bg-gradient-to-br from-blue-500 to-purple-600', openInWindow: false, dockerContainer: '' }
+
     const openAddModal = () => {
         setEditingShortcut(null)
-        setFormData({ name: '', url: '', icon: '🔗', iconType: 'emoji', iconSlug: '', color: 'bg-gradient-to-br from-blue-500 to-purple-600', openInWindow: false })
+        setFormData(emptyForm)
         setShowModal(true)
     }
 
     const closeModal = () => {
         setShowModal(false)
         setEditingShortcut(null)
-        setFormData({ name: '', url: '', icon: '🔗', iconType: 'emoji', iconSlug: '', color: 'bg-gradient-to-br from-blue-500 to-purple-600', openInWindow: false })
+        setFormData(emptyForm)
         setIconSearch('')
     }
 
-    // Filter icons based on search
     useEffect(() => {
         if (iconSearch.trim() === '') {
             setFilteredIcons(popularApps)
@@ -276,7 +402,6 @@ export default function DashboardClient({ user }: { user: any }) {
             const newOrder = arrayMove(shortcuts, oldIndex, newIndex)
             setShortcuts(newOrder)
 
-            // Save new order to backend
             try {
                 await fetch('/api/shortcuts/reorder', {
                     method: 'POST',
@@ -291,7 +416,6 @@ export default function DashboardClient({ user }: { user: any }) {
 
     const handleShortcutClick = (shortcut: Shortcut) => {
         if (shortcut.openInWindow) {
-            // Prepare icon for window
             const windowIcon = shortcut.iconType === 'svg' && shortcut.iconSlug ? (
                 <div
                     className="w-6 h-6 [&>svg]:w-full [&>svg]:h-full [&>svg]:fill-current"
@@ -303,7 +427,6 @@ export default function DashboardClient({ user }: { user: any }) {
                 <span className="text-2xl">{shortcut.icon}</span>
             )
 
-            // Open in window with icon
             openWindow(
                 shortcut.id,
                 shortcut.name,
@@ -313,7 +436,6 @@ export default function DashboardClient({ user }: { user: any }) {
                 shortcut.iconSlug
             )
         } else {
-            // Open in new tab
             window.open(shortcut.url, '_blank', 'noopener,noreferrer')
         }
     }
@@ -327,8 +449,6 @@ export default function DashboardClient({ user }: { user: any }) {
     }
 
     const wallpaper = user?.wallpaper || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop'
-
-
 
     const colorOptions = [
         'bg-gradient-to-br from-blue-500 to-cyan-500',
@@ -407,7 +527,6 @@ export default function DashboardClient({ user }: { user: any }) {
                                 />
                             </button>
 
-                            {/* Shortcuts */}
                             {shortcuts.map(shortcut => (
                                 <SortableShortcut
                                     key={shortcut.id}
@@ -416,10 +535,11 @@ export default function DashboardClient({ user }: { user: any }) {
                                     onDelete={handleDeleteShortcut}
                                     onEdit={handleEditShortcut}
                                     onClick={handleShortcutClick}
+                                    dockerState={shortcut.dockerContainer ? dockerStatuses[shortcut.dockerContainer] : undefined}
+                                    onDockerToggle={handleDockerToggle}
                                 />
                             ))}
 
-                            {/* Add Button (only in edit mode) */}
                             {editMode && (
                                 <button onClick={openAddModal}>
                                     <AppIcon
@@ -436,7 +556,7 @@ export default function DashboardClient({ user }: { user: any }) {
                 {/* Add/Edit Shortcut Modal */}
                 {showModal && (
                     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
-                        <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-96 border border-white/20 animate-in zoom-in-95 duration-300">
+                        <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-96 border border-white/20 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
                             <h3 className="text-lg font-semibold mb-4 text-gray-900">
                                 {editingShortcut ? t('shortcuts.edit') : t('shortcuts.add')}
                             </h3>
@@ -464,11 +584,9 @@ export default function DashboardClient({ user }: { user: any }) {
                                     />
                                 </div>
 
-
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">{t('shortcuts.icon')}</label>
 
-                                    {/* Search */}
                                     <div className="relative mb-3">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                         <input
@@ -480,7 +598,6 @@ export default function DashboardClient({ user }: { user: any }) {
                                         />
                                     </div>
 
-                                    {/* Icon Grid */}
                                     <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
                                         <div className="grid grid-cols-6 gap-2">
                                             {filteredIcons.map((app) => (
@@ -504,7 +621,6 @@ export default function DashboardClient({ user }: { user: any }) {
                                         )}
                                     </div>
 
-                                    {/* Selected Icon Preview */}
                                     {formData.iconType === 'svg' && formData.iconSlug && (
                                         <div className="mt-2 p-2 bg-primary-50 rounded-lg flex items-center gap-2">
                                             <div
@@ -544,6 +660,52 @@ export default function DashboardClient({ user }: { user: any }) {
                                             {t('shortcuts.openInWindow')}
                                         </span>
                                     </label>
+                                </div>
+
+                                {/* Docker Container Link */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 flex items-center gap-1">
+                                            <Container className="w-4 h-4" />
+                                            Link Docker Container
+                                        </label>
+                                        {dockerModalError && (
+                                            <button
+                                                type="button"
+                                                onClick={() => fetchDockerStatuses(true)}
+                                                className="text-xs text-primary-600 hover:underline"
+                                            >
+                                                Retry
+                                            </button>
+                                        )}
+                                    </div>
+                                    {dockerModalError ? (
+                                        <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
+                                            {dockerModalError}
+                                        </div>
+                                    ) : dockerModalLoading ? (
+                                        <div className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-400">
+                                            Loading containers...
+                                        </div>
+                                    ) : (
+                                        <select
+                                            value={formData.dockerContainer}
+                                            onChange={(e) => setFormData({ ...formData, dockerContainer: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                        >
+                                            <option value="">— None —</option>
+                                            {dockerContainers.map((c) => (
+                                                <option key={c.id} value={c.name}>
+                                                    {c.name} ({c.state}){c.protected ? ' 🔒' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    {formData.dockerContainer && !dockerModalError && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            A status dot will appear on the shortcut icon. Click it to start/stop the container.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 

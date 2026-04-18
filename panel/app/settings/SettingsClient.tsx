@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Users, FolderOpen, Plus, Trash2, Edit2, Save, X, HardDrive, User as UserIcon, Image, Upload, Palette } from 'lucide-react'
+import { Users, FolderOpen, Plus, Trash2, Edit2, Save, X, HardDrive, User as UserIcon, Image, Upload, Palette, Container, Lock, Unlock } from 'lucide-react'
 import { folderIcons, getFolderIcon } from '@/lib/folderIcons'
 import UserProfile from '@/components/UserProfile'
 import { useSettings } from '@/components/SettingsContext'
@@ -12,7 +12,7 @@ export default function SettingsClient({ user }: { user: any }) {
     const { t, language, setLanguage, theme, setTheme } = useSettings()
     const [users, setUsers] = useState<User[]>([])
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<'users' | 'folders' | 'profile'>(user.role === 'admin' ? 'users' : 'profile')
+    const [activeTab, setActiveTab] = useState<'users' | 'folders' | 'docker' | 'profile'>(user.role === 'admin' ? 'users' : 'profile')
 
     // Wallpaper state
     const [wallpapers, setWallpapers] = useState<Wallpaper[]>([])
@@ -50,15 +50,64 @@ export default function SettingsClient({ user }: { user: any }) {
     const [editingFolderName, setEditingFolderName] = useState('')
     const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all')
 
+    // Docker state (admin only)
+    interface DockerContainer { id: string; shortId: string; name: string; image: string; state: string; status: string; protected: boolean }
+    const [dockerContainers, setDockerContainers] = useState<DockerContainer[]>([])
+    const [dockerLoading, setDockerLoading] = useState(false)
+    const [dockerSaving, setDockerSaving] = useState(false)
+
     useEffect(() => {
         fetchUsers()
         fetchFolderConfig()
         fetchWallpapers()
     }, [])
 
+    useEffect(() => {
+        if (activeTab === 'docker' && user.role === 'admin') {
+            fetchDockerContainers()
+        }
+    }, [activeTab])
+
+    const fetchDockerContainers = async () => {
+        setDockerLoading(true)
+        try {
+            const res = await fetch('/api/docker/containers')
+            if (res.ok) {
+                setDockerContainers(await res.json())
+            }
+        } catch (error) {
+            console.error('Failed to fetch Docker containers:', error)
+        } finally {
+            setDockerLoading(false)
+        }
+    }
+
+    const toggleProtected = async (containerName: string, currentlyProtected: boolean) => {
+        const updated = dockerContainers.map(c =>
+            c.name === containerName ? { ...c, protected: !currentlyProtected } : c
+        )
+        setDockerContainers(updated)
+
+        setDockerSaving(true)
+        try {
+            const protectedContainers = updated.filter(c => c.protected).map(c => c.name)
+            await fetch('/api/docker/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ protectedContainers })
+            })
+        } catch (error) {
+            console.error('Failed to save Docker config:', error)
+            // Revert on error
+            setDockerContainers(dockerContainers)
+        } finally {
+            setDockerSaving(false)
+        }
+    }
+
     const fetchWallpapers = async () => {
         try {
-            const res = await fetch('/api/wallpapers')
+            const res = await fetch('/api/wallpapers', { cache: 'no-store' })
             if (res.ok) {
                 const customWallpapers = await res.json()
                 setWallpapers(customWallpapers)
@@ -77,6 +126,7 @@ export default function SettingsClient({ user }: { user: any }) {
         // Check limit (4 defaults + 8 custom = 12 total)
         if (wallpapers.length >= 8) {
             alert('Maximum 8 custom wallpapers allowed. Please delete some first.')
+            e.target.value = ''
             return
         }
 
@@ -92,11 +142,15 @@ export default function SettingsClient({ user }: { user: any }) {
 
             if (res.ok) {
                 await fetchWallpapers()
+            } else {
+                const msg = await res.text()
+                alert(`Upload failed: ${msg}`)
             }
         } catch (error) {
-            console.error('Failed to upload wallpaper:', error)
+            alert('Upload error: ' + (error instanceof Error ? error.message : String(error)))
         } finally {
             setUploadingWallpaper(false)
+            e.target.value = ''
         }
     }
 
@@ -150,7 +204,7 @@ export default function SettingsClient({ user }: { user: any }) {
     }
 
     const confirmApplyChanges = () => {
-        window.location.reload()
+        window.location.href = '/'
     }
 
     const fetchUsers = async () => {
@@ -466,6 +520,16 @@ export default function SettingsClient({ user }: { user: any }) {
                                 >
                                     <FolderOpen className="w-5 h-5 mr-2" />
                                     {t('tabs.folders')}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('docker')}
+                                    className={`flex items-center px-6 py-4 font-medium transition-colors ${activeTab === 'docker'
+                                        ? 'border-b-2 border-primary-500 text-primary-600'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <Container className="w-5 h-5 mr-2" />
+                                    Docker
                                 </button>
                             </>
                         )}
@@ -885,6 +949,71 @@ export default function SettingsClient({ user }: { user: any }) {
                         </div>
                     )}
 
+                    {/* Docker Tab */}
+                    {activeTab === 'docker' && (
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-2">
+                                <h2 className="text-xl font-semibold">Docker Containers</h2>
+                                <button
+                                    onClick={fetchDockerContainers}
+                                    disabled={dockerLoading}
+                                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                >
+                                    {dockerLoading ? 'Loading...' : 'Refresh'}
+                                </button>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-6">
+                                Lock containers so regular users cannot start or stop them. Admins can always control any container.
+                            </p>
+
+                            {dockerSaving && (
+                                <div className="mb-4 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm">Saving...</div>
+                            )}
+
+                            {dockerLoading ? (
+                                <div className="text-gray-500 text-sm py-8 text-center">Loading containers...</div>
+                            ) : dockerContainers.length === 0 ? (
+                                <div className="text-gray-500 text-sm py-8 text-center">
+                                    No containers found. Make sure Docker socket is accessible.
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {dockerContainers.map(container => (
+                                        <div key={container.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                                            <div className="flex items-center gap-3 flex-1">
+                                                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${container.state === 'running' ? 'bg-green-400' : 'bg-gray-400'}`} />
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium text-gray-900">{container.name}</span>
+                                                        {container.protected && (
+                                                            <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">Protected</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">{container.image} · {container.status}</div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => toggleProtected(container.name, container.protected)}
+                                                title={container.protected ? 'Unprotect — allow users to control' : 'Protect — only admin can control'}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                                                    container.protected
+                                                        ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {container.protected ? (
+                                                    <><Lock className="w-3.5 h-3.5" /> Locked</>
+                                                ) : (
+                                                    <><Unlock className="w-3.5 h-3.5" /> Open</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Profile Tab */}
                     {activeTab === 'profile' && (
                         <div className="p-6">
@@ -904,7 +1033,7 @@ export default function SettingsClient({ user }: { user: any }) {
 
             {/* Apply Changes Button (Floating) */}
             {pendingWallpaperChange && (
-                <div className="fixed bottom-8 right-8 z-50">
+                <div className="fixed bottom-8 right-8 z-[10000]">
                     <button
                         onClick={handleApplyChanges}
                         className="px-6 py-3 bg-primary-600 text-white rounded-lg shadow-2xl hover:bg-primary-700 transition-all flex items-center gap-2 animate-bounce"

@@ -4,17 +4,19 @@ import { promises as fs } from "fs"
 import path from "path"
 import { writeFile } from "fs/promises"
 
-const WALLPAPERS_DIR = path.join(process.cwd(), 'public', 'wallpapers')
-const WALLPAPERS_CONFIG = path.join(process.cwd(), 'config', 'wallpapers.json')
+export const dynamic = 'force-dynamic'
 
-// Ensure directories exist
+// Custom wallpapers stored in files-storage (persisted volume, always writable)
+// Default wallpapers stay in public/wallpapers/ (served as static assets from build)
+const WALLPAPERS_DIR = path.join(process.cwd(), 'files-storage', 'wallpapers')
+const CONFIG_DIR = path.join(process.cwd(), 'config')
+const WALLPAPERS_CONFIG = path.join(CONFIG_DIR, 'wallpapers.json')
+
+const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'])
+
 async function ensureDirectories() {
-    try {
-        await fs.access(WALLPAPERS_DIR)
-    } catch {
-        await fs.mkdir(WALLPAPERS_DIR, { recursive: true })
-    }
-
+    await fs.mkdir(WALLPAPERS_DIR, { recursive: true })
+    await fs.mkdir(CONFIG_DIR, { recursive: true })
     try {
         await fs.access(WALLPAPERS_CONFIG)
     } catch {
@@ -52,15 +54,18 @@ export async function POST(req: Request) {
             return new NextResponse("No file provided", { status: 400 })
         }
 
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
+        // Validate file type by MIME or extension
+        const extension = (file.name.split('.').pop() || '').toLowerCase()
+        const isMimeOk = file.type.startsWith('image/')
+        const isExtOk = ALLOWED_EXTENSIONS.has(extension)
+        if (!isMimeOk && !isExtOk) {
             return new NextResponse("File must be an image", { status: 400 })
         }
 
         // Generate unique filename
         const timestamp = Date.now()
-        const extension = file.name.split('.').pop()
-        const filename = `wallpaper_${timestamp}.${extension}`
+        const safeExt = isExtOk ? extension : 'jpg'
+        const filename = `wallpaper_${timestamp}.${safeExt}`
         const filepath = path.join(WALLPAPERS_DIR, filename)
 
         // Save file
@@ -74,7 +79,7 @@ export async function POST(req: Request) {
 
         const newWallpaper = {
             id: timestamp.toString(),
-            url: `/wallpapers/${filename}`,
+            url: `/api/wallpapers/file/${filename}`,
             name: file.name,
             uploadedAt: new Date().toISOString()
         }
