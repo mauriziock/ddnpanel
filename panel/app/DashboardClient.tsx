@@ -59,9 +59,10 @@ interface SortableShortcutProps {
     onClick: (shortcut: Shortcut) => void
     dockerState?: string
     onDockerToggle?: (shortcut: Shortcut, currentState: string) => void
+    isToggling?: boolean
 }
 
-function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick, dockerState, onDockerToggle }: SortableShortcutProps) {
+function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick, dockerState, onDockerToggle, isToggling }: SortableShortcutProps) {
     const {
         attributes,
         listeners,
@@ -114,23 +115,26 @@ function SortableShortcut({ shortcut, editMode, onDelete, onEdit, onClick, docke
                         )
                     }
                     color={shortcut.color}
+                    badge={
+                        hasDocker && !editMode ? (
+                            <button
+                                onClick={handleDockerBadgeClick}
+                                disabled={isToggling}
+                                title={isToggling ? 'Processing...' : dockerState === 'running' ? 'Running — click to stop' : 'Stopped — click to start'}
+                                className={`absolute bottom-2 right-2 w-4 h-4 rounded-full ring-[2px] ring-white/80 shadow-[0_2px_4px_rgba(0,0,0,0.3)] transition-all flex items-center justify-center ${
+                                    isToggling
+                                        ? 'bg-yellow-500 animate-spin border-2 border-dashed border-white'
+                                        : dockerState === 'running'
+                                        ? 'bg-emerald-500 hover:bg-red-500 hover:scale-110 cursor-pointer'
+                                        : dockerState
+                                        ? 'bg-gray-400 hover:bg-emerald-500 hover:scale-110 cursor-pointer'
+                                        : 'bg-gray-300 cursor-not-allowed'
+                                }`}
+                            />
+                        ) : undefined
+                    }
                 />
             </div>
-
-            {/* Docker status badge */}
-            {hasDocker && !editMode && (
-                <button
-                    onClick={handleDockerBadgeClick}
-                    title={dockerState === 'running' ? 'Running — click to stop' : 'Stopped — click to start'}
-                    className={`absolute bottom-5 right-1 w-4 h-4 rounded-full border-2 border-white shadow-md transition-colors ${
-                        dockerState === 'running'
-                            ? 'bg-green-400 hover:bg-red-400'
-                            : dockerState
-                            ? 'bg-gray-500 hover:bg-green-400'
-                            : 'bg-gray-400'
-                    }`}
-                />
-            )}
 
             {editMode && (
                 <div className="absolute -top-2 -right-2 flex gap-1 z-10">
@@ -537,6 +541,7 @@ export default function DashboardClient({ user }: { user: any }) {
                                     onClick={handleShortcutClick}
                                     dockerState={shortcut.dockerContainer ? dockerStatuses[shortcut.dockerContainer] : undefined}
                                     onDockerToggle={handleDockerToggle}
+                                    isToggling={dockerTogglingId === shortcut.id}
                                 />
                             ))}
 

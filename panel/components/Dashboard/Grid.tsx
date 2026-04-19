@@ -28,9 +28,10 @@ interface AppIconProps {
     onClick?: () => void
     color?: string
     className?: string
+    badge?: React.ReactNode
 }
 
-export function AppIcon({ name, icon, onClick, color = "bg-blue-500", className }: AppIconProps) {
+export function AppIcon({ name, icon, onClick, color = "bg-blue-500", className, badge }: AppIconProps) {
     return (
         <motion.div
             whileHover={{ scale: 1.05, y: -5 }}
@@ -38,13 +39,16 @@ export function AppIcon({ name, icon, onClick, color = "bg-blue-500", className 
             className={cn("flex flex-col items-center justify-center p-4 cursor-pointer group", className)}
             onClick={onClick}
         >
-            <div className={cn(
-                "w-20 h-20 rounded-2xl shadow-xl flex items-center justify-center text-white text-4xl mb-3",
-                "backdrop-blur-md bg-opacity-90 border border-white/20 transition-all duration-300",
-                "group-hover:shadow-2xl group-hover:brightness-110",
-                color
-            )}>
-                {icon}
+            <div className="relative">
+                <div className={cn(
+                    "w-20 h-20 rounded-2xl shadow-xl flex items-center justify-center text-white text-4xl mb-3",
+                    "backdrop-blur-md bg-opacity-90 border border-white/20 transition-all duration-300",
+                    "group-hover:shadow-2xl group-hover:brightness-110",
+                    color
+                )}>
+                    {icon}
+                </div>
+                {badge}
             </div>
             <span className="text-white font-medium text-lg drop-shadow-md text-center select-none group-hover:text-blue-100 transition-colors">
                 {name}
