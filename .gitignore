@@ -11,3 +11,7 @@ docker-compose.override.yml
 
 # OS
 .DS_Store
+
+# Local project docs
+PROJECT_MAP.md
+IDEAS.md
