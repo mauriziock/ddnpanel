@@ -4,6 +4,7 @@ export interface Wallpaper {
     name: string;
     uploadedAt: string;
     isDefault?: boolean;
+    userId?: string;
 }
 
 export const DEFAULT_WALLPAPERS: Wallpaper[] = [

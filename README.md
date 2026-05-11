@@ -68,6 +68,39 @@ Accede a traves de `http://localhost:3000`.
 | NEXTAUTH_URL | (Deprecated) Usar AUTH_URL en su lugar | No |
 | AUTH_URL | URL completa del panel (ej: https://panel.com/api/auth) | Si (en Produccion) |
 
+## Deteccion de Dispositivos en Servidor Headless
+
+Si despliegas en un servidor sin interfaz gráfica (sin GUI), el directorio `/run/media` no existe al arrancar porque `udisks2` solo lo crea cuando hay sesión de escritorio activa.
+
+A partir de **Docker Compose 5.x**, montar un directorio que no existe genera el error:
+```
+invalid mount config for type "bind": bind source path does not exist: /run/media
+```
+
+Para resolverlo, reemplaza el formato corto por el formato largo con `create_host_path: true`:
+
+```yaml
+# En lugar del formato corto (falla con Compose 5.x si el directorio no existe):
+# - /run/media:/run/media:rslave
+
+# Usar formato largo:
+- type: bind
+  source: /run/media
+  target: /run/media
+  bind:
+    propagation: rslave
+    create_host_path: true
+```
+
+`create_host_path: true` crea el directorio vacío si no existe. `rslave` sigue propagando los mount events del host al contenedor, por lo que el hot-plug de USBs y discos externos funciona igual.
+
+> Para que los dispositivos se monten automáticamente en `/run/media` sin sesión gráfica, instala `udiskie` como servicio de systemd en el host:
+> ```bash
+> sudo apt install udiskie
+> systemctl --user enable --now udiskie
+> sudo loginctl enable-linger $USER
+> ```
+
 ## Construccion desde el Codigo Fuente
 
 Si prefieres compilar la imagen tu mismo o realizar modificaciones:

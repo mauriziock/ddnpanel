@@ -6,8 +6,6 @@ import { writeFile } from "fs/promises"
 
 export const dynamic = 'force-dynamic'
 
-// Custom wallpapers stored in files-storage (persisted volume, always writable)
-// Default wallpapers stay in public/wallpapers/ (served as static assets from build)
 const WALLPAPERS_DIR = path.join(process.cwd(), 'files-storage', 'wallpapers')
 const CONFIG_DIR = path.join(process.cwd(), 'config')
 const WALLPAPERS_CONFIG = path.join(CONFIG_DIR, 'wallpapers.json')
@@ -17,6 +15,7 @@ const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif',
 async function ensureDirectories() {
     await fs.mkdir(WALLPAPERS_DIR, { recursive: true })
     await fs.mkdir(CONFIG_DIR, { recursive: true })
+
     try {
         await fs.access(WALLPAPERS_CONFIG)
     } catch {
@@ -24,25 +23,28 @@ async function ensureDirectories() {
     }
 }
 
-// GET - List all wallpapers
+// GET - List wallpapers for the current user
 export async function GET() {
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    const userId = session.user?.id
 
     try {
         await ensureDirectories()
         const data = await fs.readFile(WALLPAPERS_CONFIG, 'utf-8')
         const config = JSON.parse(data)
-        return NextResponse.json(config.wallpapers || [])
+        const userWallpapers = (config.wallpapers || []).filter((w: any) => w.userId === userId)
+        return NextResponse.json(userWallpapers)
     } catch (error: any) {
         return new NextResponse("Error reading wallpapers: " + error.message, { status: 500 })
     }
 }
 
-// POST - Upload new wallpaper
+// POST - Upload wallpaper for the current user
 export async function POST(req: Request) {
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    const userId = session.user?.id
 
     try {
         await ensureDirectories()
@@ -50,11 +52,8 @@ export async function POST(req: Request) {
         const formData = await req.formData()
         const file = formData.get('file') as File
 
-        if (!file) {
-            return new NextResponse("No file provided", { status: 400 })
-        }
+        if (!file) return new NextResponse("No file provided", { status: 400 })
 
-        // Validate file type by MIME or extension
         const extension = (file.name.split('.').pop() || '').toLowerCase()
         const isMimeOk = file.type.startsWith('image/')
         const isExtOk = ALLOWED_EXTENSIONS.has(extension)
@@ -62,23 +61,20 @@ export async function POST(req: Request) {
             return new NextResponse("File must be an image", { status: 400 })
         }
 
-        // Generate unique filename
         const timestamp = Date.now()
         const safeExt = isExtOk ? extension : 'jpg'
         const filename = `wallpaper_${timestamp}.${safeExt}`
         const filepath = path.join(WALLPAPERS_DIR, filename)
 
-        // Save file
         const bytes = await file.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-        await writeFile(filepath, buffer)
+        await writeFile(filepath, new Uint8Array(bytes))
 
-        // Update config
         const data = await fs.readFile(WALLPAPERS_CONFIG, 'utf-8')
         const config = JSON.parse(data)
 
         const newWallpaper = {
             id: timestamp.toString(),
+            userId,
             url: `/api/wallpapers/file/${filename}`,
             name: file.name,
             uploadedAt: new Date().toISOString()
@@ -86,7 +82,6 @@ export async function POST(req: Request) {
 
         config.wallpapers = config.wallpapers || []
         config.wallpapers.push(newWallpaper)
-
         await fs.writeFile(WALLPAPERS_CONFIG, JSON.stringify(config, null, 2))
 
         return NextResponse.json(newWallpaper)
@@ -95,24 +90,22 @@ export async function POST(req: Request) {
     }
 }
 
-// DELETE - Remove wallpaper
+// DELETE - Remove a wallpaper (only owner can delete)
 export async function DELETE(req: Request) {
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    const userId = session.user?.id
 
     try {
         const { id } = await req.json()
-
         await ensureDirectories()
         const data = await fs.readFile(WALLPAPERS_CONFIG, 'utf-8')
         const config = JSON.parse(data)
 
         const wallpaper = config.wallpapers.find((w: any) => w.id === id)
-        if (!wallpaper) {
-            return new NextResponse("Wallpaper not found", { status: 404 })
-        }
+        if (!wallpaper) return new NextResponse("Wallpaper not found", { status: 404 })
+        if (wallpaper.userId !== userId) return new NextResponse("Forbidden", { status: 403 })
 
-        // Delete file
         const filename = wallpaper.url.split('/').pop()
         const filepath = path.join(WALLPAPERS_DIR, filename)
 
@@ -122,7 +115,6 @@ export async function DELETE(req: Request) {
             console.error('Error deleting file:', error)
         }
 
-        // Update config
         config.wallpapers = config.wallpapers.filter((w: any) => w.id !== id)
         await fs.writeFile(WALLPAPERS_CONFIG, JSON.stringify(config, null, 2))
 

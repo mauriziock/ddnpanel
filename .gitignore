@@ -6,6 +6,9 @@
 config/
 files-storage/
 
+# Wallpapers subidos por usuarios (no deben entrar en la imagen)
+panel/public/wallpapers/*/
+
 # Docker override (local dev only)
 docker-compose.override.yml
 
